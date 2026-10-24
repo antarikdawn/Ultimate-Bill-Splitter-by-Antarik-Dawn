@@ -3,7 +3,7 @@
 A feature-rich, single-page web application designed to make splitting bills and tracking expenses among friends effortless. Everything runs securely in your browser with offline auto-saving.
 
 ## Main File
-To run this application, simply open the **ULTIMATE BILL SPLITTER beta.html** file in any modern web browser.
+To run this application, simply visit **https://antarikdawn.github.io/Ultimate-Bill-Splitter-by-Antarik-Dawn/** or open the **index.html** file in any modern web browser.
 
 ## Key Features
 
@@ -21,7 +21,7 @@ To run this application, simply open the **ULTIMATE BILL SPLITTER beta.html** fi
 
 ## How to Use
 
-1. **Setup Party:** Launch `ULTIMATE BILL SPLITTER beta.html`. Enter an event name, optional dates, and the number of people splitting the bill.
+1. **Setup Party:** Launch `index.html`. Enter an event name, optional dates, and the number of people splitting the bill.
 2. **Enter Names:** Provide a name for each participant.
 3. **Add Expenses:** Log what was bought, how much it cost, who paid for it, and who shared it. Use the "Edit Quantities" toggle if someone had more or less of a shared item.
 4. **Log Payments:** If someone pays someone else directly during the trip, log it in the "Direct Payment" section.
