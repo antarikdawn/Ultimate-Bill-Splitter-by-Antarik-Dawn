@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Bill Splitter</title>
+    <!-- Include SheetJS for Excel Import/Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Include html2pdf for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; 
+        }
+        .container { max-width: 900px; margin: auto; }
+        .title-container { text-align: center; margin-bottom: 20px; }
+        h1 { color: #2c3e50; margin-bottom: 5px; display: inline-block; }
+        .subtitle { color: #7f8c8d; font-size: 14px; margin-bottom: 10px; }
+        
+        .header-actions {
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            flex-wrap: wrap; gap: 10px;
+        }
+        .action-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        
+        .badge { background: #2ecc71; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; display: none; }
+        .card { background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; }
+        input[type="text"], input[type="number"], select { 
+            width: 100%; padding: 10px; box-sizing: border-box; 
+            border: 1px solid #ccc; border-radius: 5px; font-size: 16px; 
+        }
+        
+        .main-btn { 
+            width: 100%; padding: 12px; background-color: #3498db; color: white; 
+            border: none; border-radius: 5px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; 
+        }
+        .main-btn:hover { background-color: #2980b9; }
+        .main-btn.update-mode { background-color: #f39c12; }
+        .main-btn.danger { background-color: #e74c3c; }
+        
+        .btn-small { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 13px; font-weight: bold; }
+        .btn-edit { background-color: #f39c12; }
+        .btn-edit:hover { background-color: #d68910; }
+        .btn-delete { background-color: #e74c3c; }
+        .btn-excel { background-color: #27ae60; }
+        .btn-excel:hover { background-color: #219653; }
+        .btn-pdf { background-color: #e74c3c; }
+        .btn-pdf:hover { background-color: #c0392b; }
+        .btn-whatsapp { background-color: #25D366; color: white; }
+        .btn-whatsapp:hover { background-color: #128C7E; }
+        .btn-title-edit { background: none; border: none; color: #3498db; cursor: pointer; font-size: 16px; margin-left: 10px; }
+        
+        /* Dynamic Split Group Styles */
+        .split-group { display: flex; flex-wrap: wrap; gap: 15px; background: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
+        .split-item { display: flex; align-items: center; gap: 8px; }
+        .split-item label { margin-bottom: 0; font-weight: normal; font-size: 14px; min-width: 60px; cursor: pointer; }
+        .split-item input[type="number"] { width: 70px; padding: 5px; }
+        .split-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .toggle-qty-label { font-size: 13px; color: #3498db; cursor: pointer; display: inline-flex; align-items: center; margin-top: 8px; }
+        .toggle-qty-label input { margin-right: 5px; }
+        
+        .people-pills { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+        .people-pills li { background: #ecf0f1; padding: 8px 15px; border-radius: 20px; display: flex; align-items: center; gap: 10px; border: 1px solid #bdc3c7; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #3498db; color: white; }
+        
+        .settlement-list { list-style: none; padding: 0; }
+        .settlement-list li { background: #e8f5e9; margin-bottom: 10px; padding: 15px; border-left: 5px solid #2ecc71; border-radius: 4px; font-size: 16px; }
+        .net-positive { color: #27ae60; font-weight: bold; }
+        .net-negative { color: #c0392b; font-weight: bold; }
+        
+        #import-file { display: none; }
+
+        /* Avoid breaking elements in PDF */
+        .card, tr, li, .split-item { page-break-inside: avoid; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="title-container">
+        <h1 id="main-title">💸 Ultimate Bill Splitter</h1>
+        <button class="btn-title-edit" id="edit-event-btn" onclick="editEventInfo()" style="display:none;">✎ Edit Event Info</button>
+        <div class="subtitle" id="event-date-display"></div>
+        <div class="subtitle" style="color:#bdc3c7; font-size: 12px;">With Offline Sync & Easy Sharing</div>
+    </div>
+
+    <div class="header-actions">
+        <div class="action-group">
+            <span id="save-badge" class="badge">Auto-Saved</span>
+            <button class="btn-small btn-delete" onclick="clearAllData()">🗑️ Clear Data</button>
+        </div>
+        <div class="action-group" id="share-buttons" style="display: none;">
+            <button class="btn-small btn-pdf" onclick="downloadPDF()">📄 Download PDF</button>
+            <button class="btn-small btn-whatsapp" onclick="copyForWhatsApp()">💬 WhatsApp Text</button>
+        </div>
+        <div class="action-group">
+            <button class="btn-small btn-excel" onclick="exportExcel()">⬇️ Export Excel</button>
+            <button class="btn-small btn-excel" style="background-color: #2980b9;" onclick="triggerImport()">⬆️ Import Excel</button>
+            <input type="file" id="import-file" accept=".xlsx, .xls, .csv" onchange="handleImport(event)">
+        </div>
+    </div>
+    
+    <div class="card" id="setup-section">
+        <h2>1. Setup Party</h2>
+        <div class="form-group">
+            <label for="event-name-input">Event Name</label>
+            <input type="text" id="event-name-input" placeholder="e.g., Houseparty">
+        </div>
+        <div class="form-group">
+            <label for="event-date-input">Event Date(s) (Optional)</label>
+            <input type="text" id="event-date-input" placeholder="e.g., 23 May to 25 May 2026">
+        </div>
+        <div class="form-group">
+            <label for="num-people">How many people are splitting?</label>
+            <input type="number" id="num-people" min="2" value="3">
+        </div>
+        <button class="main-btn" onclick="generateNameInputs()">Next: Enter Names</button>
+        <div id="names-container" style="margin-top: 20px;"></div>
+    </div>
+
+    <div id="input-section" style="display: none;">
+        <div class="card">
+            <h2>👥 Manage Party</h2>
+            <p style="font-size: 13px; color: #7f8c8d;">Edit names or add new people mid-event.</p>
+            <ul class="people-pills" id="people-list"></ul>
+            <button class="btn-small" style="background-color: #3498db; margin-top: 15px;" onclick="addNewPerson()">+ Add New Person</button>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h2 id="expense-title">🛒 Add Expense</h2>
+                <div class="form-group"><label>Item Name</label><input type="text" id="item-name" placeholder="e.g., Dinner, Chicken"></div>
+                <div class="form-group"><label>Amount (₹)</label><input type="number" id="amount" placeholder="0.00" step="0.01"></div>
+                <div class="form-group"><label>Who Paid?</label><select id="paid-by"></select></div>
+                <div class="form-group">
+                    <label>Split among:</label>
+                    <div class="split-group" id="split-among"></div>
+                    <label class="toggle-qty-label">
+                        <input type="checkbox" id="toggle-qty" onchange="renderSplitInputs()"> Edit Quantities
+                    </label>
+                </div>
+                <button id="submit-exp-btn" class="main-btn" onclick="submitExpense()">+ Add Expense</button>
+                <button id="cancel-exp-btn" class="main-btn danger" style="display:none; margin-top: 10px;" onclick="resetExpenseForm()">Cancel Edit</button>
+            </div>
+
+            <div class="card">
+                <h2 id="payment-title">💸 Log a Direct Payment</h2>
+                <p style="font-size: 13px; color: #7f8c8d;">If someone pays another directly via UPI/Cash.</p>
+                <div class="form-group"><label>Who sent the money?</label><select id="payer"></select></div>
+                <div class="form-group"><label>Who received it?</label><select id="payee"></select></div>
+                <div class="form-group"><label>Amount Sent (₹)</label><input type="number" id="payment-amount" placeholder="0.00" step="0.01"></div>
+                <button id="submit-pay-btn" class="main-btn" style="background-color: #9b59b6; margin-top: 20px;" onclick="submitPayment()">+ Add Payment</button>
+                <button id="cancel-pay-btn" class="main-btn danger" style="display:none; margin-top: 10px;" onclick="resetPaymentForm()">Cancel Edit</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results-section" style="display: none;">
+        
+        <div class="card">
+            <h2>📜 Transaction History</h2>
+            <div style="overflow-x: auto;">
+                <table id="expenses-table">
+                    <thead><tr><th>Item</th><th>Amount</th><th>Paid By</th><th>Shared By (Qty)</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <h3 style="margin-top: 30px;">Direct Payments</h3>
+            <div style="overflow-x: auto;">
+                <table id="payments-table">
+                    <thead><tr><th>Payer</th><th>Payee</th><th>Amount</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Balance Summary</h2>
+            <div style="overflow-x: auto;">
+                <table id="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Person</th><th>Consumed</th><th>Exp. Paid</th>
+                            <th>Direct Pymts Made</th><th>Direct Pymts Rcvd</th><th>Net Balance</th>
+                            <th>Individual Bill</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>✅ Optimized Settlement Plan</h2>
+            <p style="font-size: 13px; color: #7f8c8d;">(Amounts rounded to the nearest rupee)</p>
+            <ul class="settlement-list" id="settlement-plan"></ul>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    let eventName = "Ultimate Bill Splitter";
+    let eventDate = "";
+    let people = [];
+    let expenses = [];
+    let payments = [];
+    
+    let editingExpenseIndex = -1;
+    let editingPaymentIndex = -1;
+
+    let latestStats = {};
+    let latestTransactionsText = [];
+    let latestSettlementPlans = []; // Tracks specific who-owes-whom objects
+
+    // --- Core Logic & Storage ---
+    window.onload = function() {
+        const savedData = localStorage.getItem('billSplitterUltimate');
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            eventName = parsed.eventName || "Ultimate Bill Splitter";
+            eventDate = parsed.eventDate || "";
+            people = parsed.people || [];
+            expenses = parsed.expenses || [];
+            payments = parsed.payments || [];
+
+            // Backward Compatibility: Convert old Arrays to new Object format {Person: 1}
+            expenses.forEach(exp => {
+                if (Array.isArray(exp.sharedBy)) {
+                    let newShared = {};
+                    exp.sharedBy.forEach(p => newShared[p] = 1);
+                    exp.sharedBy = newShared;
+                }
+            });
+            
+            if (people.length > 0) {
+                updateEventTitle();
+                setupInterface();
+                updateUI();
+            }
+        }
+    };
+
+    function saveData() {
+        localStorage.setItem('billSplitterUltimate', JSON.stringify({ eventName, eventDate, people, expenses, payments }));
+        const badge = document.getElementById('save-badge');
+        badge.style.display = 'inline-block';
+        setTimeout(() => { badge.style.display = 'none'; }, 2000);
+    }
+
+    function clearAllData() {
+        if(confirm("Are you sure you want to delete all data? This cannot be undone.")) {
+            localStorage.removeItem('billSplitterUltimate');
+            location.reload();
+        }
+    }
+
+    // --- Event Name Management ---
+    function updateEventTitle() {
+        const titleEl = document.getElementById('main-title');
+        titleEl.innerText = eventName !== "Ultimate Bill Splitter" ? `💸 ${eventName}` : "💸 Ultimate Bill Splitter";
+        document.getElementById('event-date-display').innerText = eventDate ? `📅 ${eventDate}` : '';
+        document.getElementById('edit-event-btn').style.display = 'inline-block';
+    }
+
+    function editEventInfo() {
+        let newEvent = prompt("Enter Event Name:", eventName);
+        if (newEvent !== null && newEvent.trim() !== "") {
+            eventName = newEvent.trim();
+        }
+        let newDate = prompt("Enter Event Date(s):", eventDate);
+        if (newDate !== null) {
+            eventDate = newDate.trim();
+        }
+        updateEventTitle();
+        saveData();
+    }
+
+    // --- Excel Export & Import ---
+    function exportExcel() {
+        if (people.length === 0) return alert("Nothing to export yet!");
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ "Event": eventName, "Date": eventDate }]), "Settings");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(people.map(p => ({ "Name": p }))), "People");
+        
+        // Format sharedBy as string "AG (1), PM (2)"
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenses.map(e => {
+            let sharedStr = Object.entries(e.sharedBy).map(([p,q]) => q !== 1 ? `${p} (${q})` : p).join(', ');
+            return { "Item Name": e.itemName, "Amount": e.amount, "Paid By": e.paidBy, "Shared By": sharedStr };
+        })), "Expenses");
+        
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payments.map(p => ({
+            "Payer": p.payer, "Payee": p.payee, "Amount": p.amount
+        }))), "Payments");
+        
+        let safeName = eventName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        XLSX.writeFile(wb, `${safeName}_summary.xlsx`);
+    }
+
+    function triggerImport() { document.getElementById('import-file').click(); }
+
+    function handleImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+            
+            if (workbook.Sheets["Settings"]) {
+                let settings = XLSX.utils.sheet_to_json(workbook.Sheets["Settings"]);
+                if (settings[0]) {
+                    eventName = settings[0].Event || "Ultimate Bill Splitter";
+                    eventDate = settings[0].Date || "";
+                }
+            }
+            
+            if (workbook.Sheets["People"]) {
+                people = XLSX.utils.sheet_to_json(workbook.Sheets["People"]).map(row => row.Name).filter(n => n);
+            } else return alert("Invalid format. Missing 'People' sheet.");
+            
+            expenses = workbook.Sheets["Expenses"] ? XLSX.utils.sheet_to_json(workbook.Sheets["Expenses"]).map(row => {
+                let sharedObj = {};
+                if (row["Shared By"]) {
+                    row["Shared By"].split(',').forEach(s => {
+                        let match = s.trim().match(/(.+?)(?:\s*\(([\d.]+)\))?$/);
+                        if (match) {
+                            let p = match[1].trim();
+                            let q = match[2] ? parseFloat(match[2]) : 1;
+                            sharedObj[p] = q;
+                        }
+                    });
+                }
+                return { itemName: row["Item Name"], amount: parseFloat(row["Amount"]), paidBy: row["Paid By"], sharedBy: sharedObj };
+            }).filter(e => !isNaN(e.amount)) : [];
+            
+            payments = workbook.Sheets["Payments"] ? XLSX.utils.sheet_to_json(workbook.Sheets["Payments"]).map(row => ({
+                payer: row["Payer"], payee: row["Payee"], amount: parseFloat(row["Amount"])
+            })).filter(p => !isNaN(p.amount)) : [];
+
+            updateEventTitle();
+            setupInterface(); saveData(); updateUI();
+            alert("✅ Data successfully imported!");
+            event.target.value = ''; 
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // --- Sharing Features (Global & Individual) ---
+    function getIndividualBillText(person) {
+        let pStats = latestStats[person];
+        let text = `💸 *${eventName}*\n`;
+        if (eventDate) text += `📅 *${eventDate}*\n\n`;
+        text += `🧾 *Bill for ${person}*\n`;
+        
+        text += `\n🍔 *Items you shared:*\n`;
+        let sharedTotal = 0;
+        expenses.forEach(e => {
+            if (e.sharedBy[person] > 0) {
+                let totalQty = Object.values(e.sharedBy).reduce((a,b)=>a+b,0);
+                let myCost = (e.amount / totalQty) * e.sharedBy[person];
+                sharedTotal += myCost;
+                let qtyText = e.sharedBy[person] !== 1 ? ` (Qty: ${e.sharedBy[person]})` : '';
+                text += `- ${e.itemName}${qtyText}: ₹${Math.round(myCost)}\n`;
+            }
+        });
+        if (sharedTotal === 0) text += `- None\n`;
+        
+        text += `\n💳 *Items you paid for:*\n`;
+        let paidTotal = 0;
+        expenses.forEach(e => {
+            if (e.paidBy === person) {
+                paidTotal += e.amount;
+                text += `- ${e.itemName}: ₹${Math.round(e.amount)}\n`;
+            }
+        });
+        if (paidTotal === 0) text += `- None\n`;
+        
+        text += `\n📊 *Summary:*\n`;
+        text += `- Total Consumed: ₹${Math.round(pStats.consumed)}\n`;
+        text += `- Total Paid (incl direct): ₹${Math.round(pStats.expPaid + pStats.payMade)}\n`;
+        
+        text += `\n🎯 *Final Status:*\n`;
+        let personSettlements = latestSettlementPlans.filter(t => t.from === person || t.to === person);
+        if (personSettlements.length === 0) {
+            text += `⚪ Settled (₹0)\n`;
+        } else {
+            personSettlements.forEach(t => {
+                if (t.from === person) {
+                    text += `🔴 You owe ${t.to} ₹${t.amount}\n`;
+                } else if (t.to === person) {
+                    text += `🟢 You get back ₹${t.amount} from ${t.from}\n`;
+                }
+            });
+        }
+
+        return text;
+    }
+
+    function shareIndividualWhatsApp(person) {
+        let text = getIndividualBillText(person);
+        if (navigator.share) {
+            navigator.share({ title: `Bill for ${person}`, text: text })
+                .catch(err => { console.log("Share cancelled.", err); fallbackCopy(text); });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function copyForWhatsApp() {
+        if (people.length === 0) return alert("Nothing to share yet!");
+
+        let text = `💸 *${eventName}*\n`;
+        if (eventDate) text += `📅 *${eventDate}*\n\n`;
+        text += `📜 *Transaction History:*\n`;
+        
+        expenses.forEach(e => {
+            let sharedStr = Object.entries(e.sharedBy).map(([p,q]) => q !== 1 ? `${p}(${q})` : p).join(', ');
+            text += `- ${e.itemName}: ₹${Math.round(e.amount)} (Paid by ${e.paidBy}, Shared by: ${sharedStr})\n`;
+        });
+
+        if(payments.length > 0) {
+            text += `\n💳 *Direct Payments:*\n`;
+            payments.forEach(p => { text += `- ${p.payer} paid ${p.payee} ₹${Math.round(p.amount)}\n`; });
+        }
+
+        text += "\n✅ *Settlement Plan:*\n";
+        if (latestTransactionsText.length === 0) {
+            text += "🎉 All balances are settled!\n";
+        } else {
+            latestTransactionsText.forEach(t => { text += `👉 ${t}\n`; });
+        }
+
+        if (navigator.share) {
+            navigator.share({ title: `Summary - ${eventName}`, text: text })
+                .catch(err => { console.log("Share cancelled.", err); fallbackCopy(text); });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text)
+                .then(() => alert("✅ Copied! Paste directly into WhatsApp."))
+                .catch(() => legacyCopy(text));
+        } else {
+            legacyCopy(text);
+        }
+    }
+
+    function legacyCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.top = "0"; textArea.style.left = "0"; textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus(); textArea.select();
+        try {
+            document.execCommand('copy') ? alert("✅ Copied! Paste directly into WhatsApp.") : alert("❌ Browser blocked copying.");
+        } catch (err) { alert("❌ Failed to copy: " + err); }
+        document.body.removeChild(textArea);
+    }
+
+    function downloadPDF() {
+        const originalElement = document.getElementById('results-section');
+        const element = document.createElement('div');
+        element.style.padding = '20px';
+        element.innerHTML = `<h1 style="text-align:center; color:#2c3e50;">💸 ${eventName}</h1>` +
+                            (eventDate ? `<div style="text-align:center; margin-bottom: 20px;">📅 ${eventDate}</div>` : '') + 
+                            originalElement.innerHTML;
+        
+        // Remove Action buttons & Indiv Bill columns for PDF
+        element.querySelectorAll('th:last-child, td:last-child').forEach(el => el.remove());
+        element.querySelectorAll('th:nth-last-child(2), td:nth-last-child(2)').forEach(el => {
+            if (el.innerText === 'Individual Bill' || el.querySelector('.btn-pdf')) el.remove();
+        });
+        
+        const safeName = eventName.replace(/[^a-z0-9]/gi, '_');
+        const opt = {
+          margin: 0.4, filename: `${safeName}_Summary.pdf`,
+          image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    // --- Setup Phase ---
+    function generateNameInputs() {
+        const inputEvent = document.getElementById('event-name-input').value.trim();
+        if (inputEvent) eventName = inputEvent;
+        const inputDate = document.getElementById('event-date-input').value.trim();
+        if (inputDate) eventDate = inputDate;
+
+        const num = parseInt(document.getElementById('num-people').value);
+        if (num < 2) return alert('Need at least 2 people.');
+        
+        let html = '<div class="form-group"><label>Enter Names:</label>';
+        for (let i = 0; i < num; i++) html += `<input type="text" id="person-${i}" placeholder="Person ${i+1}" style="margin-bottom: 10px;">`;
+        html += '</div><button class="main-btn" style="background-color: #2ecc71;" onclick="startSplitting()">Start Splitting</button>';
+        document.getElementById('names-container').innerHTML = html;
+    }
+
+    function startSplitting() {
+        const num = parseInt(document.getElementById('num-people').value);
+        people = [];
+        for (let i = 0; i < num; i++) {
+            let name = document.getElementById(`person-${i}`).value.trim() || `Person ${i+1}`;
+            if (people.includes(name)) name += ` (${i+1})`;
+            people.push(name);
+        }
+        updateEventTitle(); setupInterface(); saveData(); updateUI();
+    }
+
+    // --- Manage Party (Edit Names) ---
+    function addNewPerson() {
+        let newName = prompt("Enter the new person's name:");
+        if (!newName) return;
+        newName = newName.trim();
+        if (people.includes(newName)) return alert("This name already exists!");
+        people.push(newName);
+        setupInterface(); saveData(); updateUI();
+    }
+
+    function renamePerson(oldName) {
+        let newName = prompt(`Enter a new name for ${oldName}:`, oldName);
+        if (!newName || newName.trim() === oldName || people.includes(newName.trim())) return;
+        newName = newName.trim();
+
+        people[people.indexOf(oldName)] = newName;
+
+        expenses.forEach(exp => {
+            if (exp.paidBy === oldName) exp.paidBy = newName;
+            if (exp.sharedBy[oldName] !== undefined) {
+                exp.sharedBy[newName] = exp.sharedBy[oldName];
+                delete exp.sharedBy[oldName];
+            }
+        });
+
+        payments.forEach(pay => {
+            if (pay.payer === oldName) pay.payer = newName;
+            if (pay.payee === oldName) pay.payee = newName;
+        });
+
+        setupInterface(); saveData(); updateUI();
+    }
+
+    // --- Dynamic Input Rendering ---
+    function renderSplitInputs(prefillObj = null) {
+        const container = document.getElementById('split-among');
+        const isQtyMode = document.getElementById('toggle-qty').checked;
+        container.innerHTML = '';
+        
+        people.forEach(p => {
+            let val = prefillObj && prefillObj[p] !== undefined ? prefillObj[p] : (isQtyMode ? 1 : 1);
+            if (isQtyMode) {
+                container.innerHTML += `
+                    <div class="split-item">
+                        <label for="split-${p}">${p}</label>
+                        <input type="number" id="split-${p}" min="0" step="0.5" value="${val}">
+                    </div>`;
+            } else {
+                let isChecked = val > 0 ? 'checked' : '';
+                container.innerHTML += `
+                    <div class="split-item">
+                        <input type="checkbox" id="split-${p}" value="${p}" ${isChecked}>
+                        <label for="split-${p}">${p}</label>
+                    </div>`;
+            }
+        });
+    }
+
+    function setupInterface() {
+        const paidBy = document.getElementById('paid-by');
+        const payer = document.getElementById('payer');
+        const payee = document.getElementById('payee');
+        
+        paidBy.innerHTML = payer.innerHTML = payee.innerHTML = '';
+        people.forEach(p => {
+            const opt = `<option value="${p}">${p}</option>`;
+            paidBy.innerHTML += opt; payer.innerHTML += opt; payee.innerHTML += opt;
+        });
+
+        document.getElementById('toggle-qty').checked = false;
+        renderSplitInputs();
+
+        document.getElementById('setup-section').style.display = 'none';
+        document.getElementById('input-section').style.display = 'block';
+        document.getElementById('results-section').style.display = 'block';
+        document.getElementById('share-buttons').style.display = 'flex';
+    }
+
+    // --- Input Handling: Expenses ---
+    function submitExpense() {
+        const itemName = document.getElementById('item-name').value.trim();
+        const amount = parseFloat(document.getElementById('amount').value);
+        const paidBy = document.getElementById('paid-by').value;
+        const isQtyMode = document.getElementById('toggle-qty').checked;
+        
+        let sharedBy = {};
+        let totalQty = 0;
+        
+        people.forEach(p => {
+            let qty = 0;
+            if (isQtyMode) {
+                qty = parseFloat(document.getElementById(`split-${p}`).value) || 0;
+            } else {
+                qty = document.getElementById(`split-${p}`).checked ? 1 : 0;
+            }
+            if (qty > 0) { sharedBy[p] = qty; totalQty += qty; }
+        });
+
+        if (!itemName || isNaN(amount) || amount <= 0 || totalQty === 0) 
+            return alert('Invalid inputs. Make sure amount > 0 and at least one person shares it.');
+        
+        if (editingExpenseIndex === -1) expenses.push({ itemName, amount, paidBy, sharedBy });
+        else expenses[editingExpenseIndex] = { itemName, amount, paidBy, sharedBy };
+        
+        resetExpenseForm(); saveData(); updateUI();
+    }
+
+    function editExpense(idx) {
+        editingExpenseIndex = idx;
+        const exp = expenses[idx];
+        document.getElementById('item-name').value = exp.itemName;
+        document.getElementById('amount').value = exp.amount;
+        document.getElementById('paid-by').value = exp.paidBy;
+        
+        let needsQtyMode = Object.values(exp.sharedBy).some(q => q !== 1 && q !== 0);
+        document.getElementById('toggle-qty').checked = needsQtyMode;
+        
+        renderSplitInputs(exp.sharedBy);
+        
+        document.getElementById('expense-title').innerText = "✎ Edit Expense";
+        const btn = document.getElementById('submit-exp-btn');
+        btn.innerText = "✓ Update Expense"; btn.classList.add('update-mode');
+        document.getElementById('cancel-exp-btn').style.display = 'block';
+        document.getElementById('expense-title').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetExpenseForm() {
+        editingExpenseIndex = -1;
+        document.getElementById('item-name').value = '';
+        document.getElementById('amount').value = '';
+        
+        document.getElementById('toggle-qty').checked = false;
+        renderSplitInputs();
+        
+        document.getElementById('expense-title').innerText = "🛒 Add Expense";
+        const btn = document.getElementById('submit-exp-btn');
+        btn.innerText = "+ Add Expense"; btn.classList.remove('update-mode');
+        document.getElementById('cancel-exp-btn').style.display = 'none';
+    }
+
+    function deleteExpense(idx) {
+        if (confirm("Delete expense?")) {
+            expenses.splice(idx, 1);
+            if (editingExpenseIndex === idx) resetExpenseForm();
+            saveData(); updateUI();
+        }
+    }
+
+    // --- Input Handling: Payments ---
+    function submitPayment() {
+        const payer = document.getElementById('payer').value;
+        const payee = document.getElementById('payee').value;
+        const amount = parseFloat(document.getElementById('payment-amount').value);
+
+        if (payer === payee) return alert("Payer and Payee cannot be the same.");
+        if (isNaN(amount) || amount <= 0) return alert('Invalid amount.');
+
+        if (editingPaymentIndex === -1) payments.push({ payer, payee, amount });
+        else payments[editingPaymentIndex] = { payer, payee, amount };
+        
+        resetPaymentForm(); saveData(); updateUI();
+    }
+
+    function editPayment(idx) {
+        editingPaymentIndex = idx;
+        const pay = payments[idx];
+        document.getElementById('payer').value = pay.payer;
+        document.getElementById('payee').value = pay.payee;
+        document.getElementById('payment-amount').value = pay.amount;
+        
+        document.getElementById('payment-title').innerText = "✎ Edit Direct Payment";
+        const btn = document.getElementById('submit-pay-btn');
+        btn.innerText = "✓ Update Payment"; btn.classList.add('update-mode');
+        document.getElementById('cancel-pay-btn').style.display = 'block';
+        document.getElementById('payment-title').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetPaymentForm() {
+        editingPaymentIndex = -1;
+        document.getElementById('payment-amount').value = '';
+        
+        document.getElementById('payment-title').innerText = "💸 Log a Direct Payment";
+        const btn = document.getElementById('submit-pay-btn');
+        btn.innerText = "+ Add Payment"; btn.classList.remove('update-mode');
+        document.getElementById('cancel-pay-btn').style.display = 'none';
+    }
+
+    function deletePayment(idx) {
+        if (confirm("Delete payment?")) {
+            payments.splice(idx, 1);
+            if (editingPaymentIndex === idx) resetPaymentForm();
+            saveData(); updateUI();
+        }
+    }
+
+    // --- UI Update & Settlement Algorithm ---
+    function updateUI() {
+        document.getElementById('people-list').innerHTML = people.map(p => `
+            <li>
+                <strong>${p}</strong>
+                <button class="btn-small btn-edit" style="padding: 3px 8px; font-size: 11px;" onclick="renamePerson('${p}')">✎ Edit Name</button>
+            </li>`).join('');
+
+        document.querySelector('#expenses-table tbody').innerHTML = expenses.map((exp, i) => {
+            let sharedStr = Object.entries(exp.sharedBy).map(([p,q]) => q !== 1 ? `${p}(${q})` : p).join(', ');
+            return `<tr>
+                <td>${exp.itemName}</td><td>₹${Math.round(exp.amount)}</td><td>${exp.paidBy}</td><td>${sharedStr}</td>
+                <td style="display:flex; gap:5px;"><button class="btn-small btn-edit" onclick="editExpense(${i})">Edit</button><button class="btn-small btn-delete" onclick="deleteExpense(${i})">Del</button></td>
+            </tr>`;
+        }).join('');
+
+        document.querySelector('#payments-table tbody').innerHTML = payments.map((pay, i) => `
+            <tr>
+                <td>${pay.payer}</td><td>${pay.payee}</td><td>₹${Math.round(pay.amount)}</td>
+                <td style="display:flex; gap:5px;"><button class="btn-small btn-edit" onclick="editPayment(${i})">Edit</button><button class="btn-small btn-delete" onclick="deletePayment(${i})">Del</button></td>
+            </tr>`).join('');
+
+        calculateBalances();
+    }
+
+    function calculateBalances() {
+        let stats = {};
+        people.forEach(p => stats[p] = { consumed: 0, expPaid: 0, payMade: 0, payRcvd: 0, net: 0 });
+
+        expenses.forEach(exp => {
+            let totalQty = Object.values(exp.sharedBy).reduce((a,b)=>a+b,0);
+            let costPerUnit = exp.amount / totalQty;
+            stats[exp.paidBy].expPaid += exp.amount; 
+            stats[exp.paidBy].net += exp.amount; 
+            
+            for (let [p, qty] of Object.entries(exp.sharedBy)) {
+                let pCost = costPerUnit * qty;
+                stats[p].consumed += pCost; 
+                stats[p].net -= pCost; 
+            }
+        });
+
+        payments.forEach(pay => {
+            stats[pay.payer].payMade += pay.amount; stats[pay.payer].net += pay.amount; 
+            stats[pay.payee].payRcvd += pay.amount; stats[pay.payee].net -= pay.amount;
+        });
+        
+        latestStats = stats;
+
+        document.querySelector('#summary-table tbody').innerHTML = people.map(p => {
+            const s = stats[p];
+            const netClass = s.net > 0.01 ? 'net-positive' : (s.net < -0.01 ? 'net-negative' : '');
+            const netText = s.net > 0.01 ? `+₹${Math.round(s.net)}` : `₹${Math.round(s.net)}`;
+            return `<tr>
+                <td><strong>${p}</strong></td>
+                <td>₹${Math.round(s.consumed)}</td>
+                <td>₹${Math.round(s.expPaid)}</td>
+                <td>₹${Math.round(s.payMade)}</td>
+                <td>₹${Math.round(s.payRcvd)}</td>
+                <td class="${netClass}">${netText}</td>
+                <td style="display:flex; gap:5px;">
+                    <button class="btn-small btn-whatsapp" style="padding: 4px 8px; font-size: 11px;" onclick="shareIndividualWhatsApp('${p}')">💬 Share</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        let debtors = [], creditors = [];
+        for (let p in stats) {
+            let netRounded = Math.round(stats[p].net);
+            if (netRounded < 0) debtors.push({ p, amt: -netRounded });
+            else if (netRounded > 0) creditors.push({ p, amt: netRounded });
+        }
+        
+        debtors.sort((a, b) => b.amt - a.amt); creditors.sort((a, b) => b.amt - a.amt);
+
+        let transHTML = [];
+        latestTransactionsText = [];
+        latestSettlementPlans = [];
+        let i = 0, j = 0;
+        
+        while (i < debtors.length && j < creditors.length) {
+            let debtor = debtors[i], creditor = creditors[j];
+            let amt = Math.min(debtor.amt, creditor.amt);
+            
+            if (amt > 0) {
+                transHTML.push(`<strong>${debtor.p}</strong> needs to pay <strong>${creditor.p}</strong> ₹${amt}`);
+                latestTransactionsText.push(`*${debtor.p}* needs to pay *${creditor.p}* ₹${amt}`);
+                latestSettlementPlans.push({ from: debtor.p, to: creditor.p, amount: amt });
+            }
+            
+            debtor.amt -= amt; creditor.amt -= amt;
+            if (debtor.amt < 0.01) i++;
+            if (creditor.amt < 0.01) j++;
+        }
+
+        const planList = document.getElementById('settlement-plan');
+        planList.innerHTML = transHTML.length === 0 ? '<li>🎉 All balances are settled!</li>' : transHTML.map(t => `<li>${t}</li>`).join('');
+    }
+</script>
+
+</body>
+</html>
